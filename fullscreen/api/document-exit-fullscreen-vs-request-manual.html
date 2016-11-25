@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<title>Document#exitFullscreen() vs. Element#requestFullscreen()</title>
+<script src="/resources/testharness.js"></script>
+<script src="/resources/testharnessreport.js"></script>
+<script src="../trusted-click.js"></script>
+<div id="log"></div>
+<div id="target"></div>
+<script>
+async_test(t => {
+  const target = document.getElementById("target");
+  trusted_request(target);
+
+  document.onfullscreenchange = t.step_func(() => {
+    document.onfullscreenchange = t.unreached_func("fullscreenchange event");
+    // We are now in fullscreen, so exiting requires a resize but requesting
+    // does not.
+    trusted_click(t.step_func(() => {
+      // Request fullscreen on the current fullscreen element, to ensure there
+      // is no short circuiting and that both requests fail. Note that the order
+      // of the two fullscreenerror events relative to the fullscreenchange
+      // event isn't tested, as it depends on whether the resize happens before
+      // the next animation frame or not.
+
+      const counts = { fullscreenchange: 0, fullscreenerror: 0 };
+      const callback = t.step_func((event) => {
+        counts[event.type]++;
+        assert_between_inclusive(counts.fullscreenchange, 0, 1, "fullscreenchange event count");
+        assert_between_inclusive(counts.fullscreenerror, 0, 2, "fullscreenerror event count");
+        if (counts.fullscreenchange == 1 && counts.fullscreenerror == 0) {
+          assert_equals(document.fullscreenElement, null);
+          t.done();
+        }
+      });
+      document.onfullscreenchange = document.onfullscreenerror = callback;
+
+      assert_equals(document.fullscreenElement, target);
+      target.requestFullscreen();
+      document.exitFullscreen();
+      target.requestFullscreen();
+    }), target);
+  });
+});
+</script>
